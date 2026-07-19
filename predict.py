@@ -188,15 +188,18 @@ def main():
     
     # Load model
     print("\n=== Loading Model ===")
-    model = PeptideTriStreamModel(config).to(device)
+    # Keep the model on CPU first. This avoids a large transient VRAM spike on
+    # 4-8 GB cards when constructing the fp32 ESM backbone and then loading the
+    # checkpoint. We only move to GPU after loading weights (and optional fp16 cast).
+    model = PeptideTriStreamModel(config)
     
     model_path = args.model_path or f"{config.SAVE_DIR}/best_model.pth"
     if not os.path.exists(model_path):
         print(f"Error: Model not found: {model_path}")
         return
     
-    # Load to CPU first to avoid holding both the model (~2.6GB fp32 ESM-2)
-    # and the checkpoint on the GPU at once (would OOM small-VRAM cards).
+    # Load checkpoint to CPU first to avoid holding both the model and the
+    # checkpoint on GPU at the same time.
     ckpt = torch.load(model_path, map_location="cpu", weights_only=False)
     if isinstance(ckpt, dict) and "state_dict" in ckpt:
         ckpt = ckpt["state_dict"]
@@ -210,6 +213,8 @@ def main():
     if args.fp16:
         model = model.half()
         print("Model cast to FP16 to fit limited GPU memory")
+
+    model = model.to(device)
     
     # Mode 1: Predict from FASTA file
     if args.fasta_path:
