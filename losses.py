@@ -138,7 +138,7 @@ class StructureAwareLoss(torch.nn.Module):
         self.focal_loss = FocalLoss(alpha=class_weights, gamma=gamma)
         
         if use_crf:
-            from torchcrf import CRF
+            from crf_compat import CRF
             self.crf = CRF(num_classes, batch_first=True)
     
     def forward(self, logits, targets, mask=None):

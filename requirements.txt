@@ -1,0 +1,13 @@
+# MultiAMP dependencies (validated on Python 3.11).
+# NOTE: torch / torchvision / torchaudio are installed SEPARATELY with a
+# CUDA-enabled build (see LAPTOP_SETUP.md step 2) so they match your GPU's
+# driver. Do NOT add them here.
+fair-esm==2.0.0
+torch-geometric==2.8.0
+torchcrf==1.1.0
+biopython==1.87
+scikit-learn==1.9.0
+pandas==3.0.3
+tqdm==4.69.0
+numpy==2.4.6
+scipy==1.17.1

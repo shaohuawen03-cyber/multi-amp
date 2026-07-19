@@ -14,6 +14,7 @@ def parse_args():
     parser.add_argument('--output_path', type=str, default=None, help='Output CSV path (default: auto-generated)')
     parser.add_argument('--batch_size', type=int, default=None, help='Batch size (default: from config)')
     parser.add_argument('--gpu', type=str, default='1', help='GPU device ID (default: 1)')
+    parser.add_argument('--fp16', action='store_true', help='Cast model to FP16 (recommended for <=8GB GPUs like GTX 1650)')
     return parser.parse_args()
 
 args = parse_args()
@@ -42,7 +43,8 @@ def predict(model, data_loader, device):
             # Move to device
             sequences = batch['sequence_str']
             labels = batch['label'].cpu().numpy()
-            attention_mask = batch['attention_mask'].to(device, non_blocking=True)
+            attention_mask = batch['attention_mask'].to(
+                device=device, dtype=next(model.parameters()).dtype, non_blocking=True)
             
             contact_maps = batch.get('contact_maps')
             if contact_maps is not None:
@@ -151,7 +153,8 @@ def predict_from_fasta(model, fasta_path, device, batch_size=16):
             for seq in batch_seqs:
                 mask = [1] * len(seq) + [0] * (max_len - len(seq))
                 attention_mask.append(mask)
-            attention_mask = torch.tensor(attention_mask, dtype=torch.float).to(device)
+            attention_mask = torch.tensor(attention_mask, dtype=torch.float).to(
+                device=device, dtype=next(model.parameters()).dtype)
             
             # Forward pass (sequence-only mode, no structural features)
             outputs = model(
@@ -192,8 +195,19 @@ def main():
         print(f"Error: Model not found: {model_path}")
         return
     
-    model.load_state_dict(torch.load(model_path, map_location=device, weights_only=False))
+    ckpt = torch.load(model_path, map_location=device, weights_only=False)
+    if isinstance(ckpt, dict) and "state_dict" in ckpt:
+        ckpt = ckpt["state_dict"]
+    try:
+        model.load_state_dict(ckpt)
+    except RuntimeError as e:
+        print(f"⚠️ Strict load failed ({e}); retrying with strict=False (some keys ignored).")
+        model.load_state_dict(ckpt, strict=False)
     print(f"Model loaded from {model_path}")
+
+    if args.fp16:
+        model = model.half()
+        print("Model cast to FP16 to fit limited GPU memory")
     
     # Mode 1: Predict from FASTA file
     if args.fasta_path:

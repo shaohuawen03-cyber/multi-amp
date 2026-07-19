@@ -442,7 +442,7 @@ class PeptideTriStreamModel(nn.Module):
         self.ss_emission_layer = nn.Linear(self.embed_dim // 2, config.NUM_SS)
 
         # 4. CRF 层（学习结构转移规律）
-        from torchcrf import CRF
+        from crf_compat import CRF
         self.ss_crf = CRF(config.NUM_SS, batch_first=True)
         
         # recon_hidden_dim = self.embed_dim // 2
@@ -645,7 +645,8 @@ class PeptideTriStreamModel(nn.Module):
             
             if not self.training:
                 mask = attention_mask_aligned.bool()
-                ss_predictions = self.ss_crf.decode(ss_emission_scores, mask=mask)
+                # Cast to float for the CRF decoder so fp16 inference works
+                ss_predictions = self.ss_crf.decode(ss_emission_scores.float(), mask=mask)
                 outputs['ss_predictions'] = ss_predictions
 
         # Return intermediate features if requested
