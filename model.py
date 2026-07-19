@@ -13,8 +13,68 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from typing import List, Dict, Tuple
+from pathlib import Path
 import esm
 import math
+
+
+def _is_corrupted_torch_archive_error(exc: Exception) -> bool:
+    """Return True when a cached ESM download was interrupted/corrupted."""
+    message = str(exc).lower()
+    signatures = [
+        "pytorchstreamreader failed reading zip archive",
+        "failed finding central directory",
+        "failed reading zip archive",
+        "unexpected eof",
+    ]
+    return any(sig in message for sig in signatures)
+
+
+def _clear_cached_esm_files(model_name: str) -> List[str]:
+    """Remove potentially corrupted fair-esm checkpoint files from torch hub cache."""
+    checkpoints_dir = Path(torch.hub.get_dir()) / "checkpoints"
+    patterns = [
+        f"{model_name}.pt",
+        f"{model_name}-contact-regression.pt",
+        f"{model_name}*.pt",
+    ]
+
+    removed_files: List[str] = []
+    seen = set()
+    for pattern in patterns:
+        for path in checkpoints_dir.glob(pattern):
+            if not path.exists():
+                continue
+            path_str = str(path)
+            if path_str in seen:
+                continue
+            seen.add(path_str)
+            try:
+                path.unlink()
+                removed_files.append(path_str)
+            except OSError:
+                pass
+    return removed_files
+
+
+def _load_esm_model_and_alphabet_with_retry(model_name: str, retries: int = 1):
+    """
+    fair-esm caches large .pt files under ~/.cache/torch/hub/checkpoints.
+    On unstable networks a partial download can be left behind, which later fails
+    with `PytorchStreamReader failed reading zip archive`. When that happens,
+    delete the broken cache file and retry once automatically.
+    """
+    for attempt in range(retries + 1):
+        try:
+            return esm.pretrained.load_model_and_alphabet(model_name)
+        except (RuntimeError, OSError, EOFError) as exc:
+            if not _is_corrupted_torch_archive_error(exc) or attempt >= retries:
+                raise
+
+            removed_files = _clear_cached_esm_files(model_name)
+            print("Detected a corrupted cached ESM download; clearing cache and retrying once...")
+            for removed in removed_files:
+                print(f"  removed: {removed}")
 
 from torch_geometric.nn import global_mean_pool
 from torch_geometric.utils import dense_to_sparse
@@ -333,7 +393,7 @@ class PeptideTriStreamModel(nn.Module):
         
         # --- Stream 1: ESM-2 Deep Feature Stream ---
         if config.USE_ESM2:
-            self.plm, self.alphabet = esm.pretrained.load_model_and_alphabet(config.PLM_NAME)
+            self.plm, self.alphabet = _load_esm_model_and_alphabet_with_retry(config.PLM_NAME)
             self.tokenizer = self.alphabet.get_batch_converter()
             self.embed_dim = self.plm.embed_dim
             self.num_plm_layers = self.plm.num_layers
@@ -342,7 +402,7 @@ class PeptideTriStreamModel(nn.Module):
         else:
             # 🔥 ESM-2 ablation: Use a simple embedding instead
             # We still need alphabet for tokenization, so load just for that
-            _, self.alphabet = esm.pretrained.load_model_and_alphabet(config.PLM_NAME)
+            _, self.alphabet = _load_esm_model_and_alphabet_with_retry(config.PLM_NAME)
             self.tokenizer = self.alphabet.get_batch_converter()
             self.embed_dim = 1280  # ESM-2 default dimension
             # Create a simple embedding layer as replacement

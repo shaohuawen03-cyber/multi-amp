@@ -40,7 +40,7 @@ Trained models and data are available on Hugging Face:
 
 **https://huggingface.co/jiayi11/multi_amp**
 
-Place downloaded checkpoints (e.g. `best_model_overall.pth`) in the `checkpoints/` directory.
+Place downloaded checkpoints (e.g. `checkpoints/best_model_overall.pth`) in the local `checkpoints/` directory.
 
 See [data/README.md](data/README.md) for details on data format and directory structure.
 
@@ -78,11 +78,15 @@ The training script saves the best model (by validation AUC) to `checkpoints/bes
 
 **Mode A: Predict from FASTA file** (sequence-only, no PDB needed)
 
+For small GPUs (e.g. GTX 1650 4 GB), add `--batch_size 1 --fp16`.
+
 ```bash
 python predict.py --gpu 0 \
     --model_path ./checkpoints/best_model_overall.pth \
     --fasta_path ./input/test_sequences.fasta \
-    --output_path ./input/predictions.csv
+    --output_path ./input/predictions.csv \
+    --batch_size 1 \
+    --fp16
 ```
 
 **Mode B: Evaluate on validation dataset** (with full structural features)

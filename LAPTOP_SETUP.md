@@ -74,9 +74,9 @@ Download the checkpoint (install the HF CLI first if needed):
 ```bash
 pip install -U huggingface_hub
 mkdir -p checkpoints
-huggingface-cli download jiayi11/multi_amp best_model_overall.pth --local-dir checkpoints
+hf download jiayi11/multi_amp checkpoints/best_model_overall.pth --local-dir .
 # or, via git:
-# git lfs install && git clone https://huggingface.co/jiayi11/multi_amp hf_tmp && cp hf_tmp/best_model_overall.pth checkpoints/
+# git lfs install && git clone https://huggingface.co/jiayi11/multi_amp hf_tmp && cp hf_tmp/checkpoints/best_model_overall.pth checkpoints/
 ```
 
 If `huggingface.co` is blocked on your network, download `best_model_overall.pth`
@@ -141,6 +141,12 @@ pip install fair-esm torchcrf biopython scikit-learn pandas tqdm
   `from crf_compat import CRF` resolves. (On case-insensitive filesystems the
   original `from torchcrf import CRF` would also resolve, but `crf_compat` is the
   safe cross-platform fix.)
-- **ESM weights won't download** (HF blocked) → fetch `esm2_t33_650M_UR50D` manually
-  and place it where fair-esm expects, or run from a network that can reach
-  huggingface.co.
+- **ESM weights download starts but then crashes with**
+  `PytorchStreamReader failed reading zip archive` or `failed finding central directory`
+  → the cached fair-esm file under `~/.cache/torch/hub/checkpoints/` is corrupted
+  (usually an interrupted download). The code in this repo now auto-deletes the
+  broken cache file and retries once. If you still hit it, delete
+  `~/.cache/torch/hub/checkpoints/esm2_t33_650M_UR50D*.pt` manually and rerun.
+- **ESM weights won't download at all** (network blocked) → fetch `esm2_t33_650M_UR50D`
+  manually and place it where fair-esm expects, or run from a network that can reach
+  `dl.fbaipublicfiles.com` / `huggingface.co`.
