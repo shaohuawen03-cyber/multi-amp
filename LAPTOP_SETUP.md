@@ -62,12 +62,13 @@ pip install -r requirements.txt
 
 ## 4. Get the trained checkpoint + ESM-2 weights
 
-The model needs two things from Hugging Face (`jiayi11/multi_amp`):
+The model needs the trained checkpoint from Hugging Face (`jiayi11/multi_amp`):
 
-1. **The trained checkpoint** `best_model_overall.pth` (contains the model weights).
-2. **ESM-2 650M weights** — downloaded automatically the first time the model is
-   built (fair-esm caches them under `~/.cache/torch/hub` or `~/.esm`). This needs
-   internet access to huggingface.co.
+1. **The trained checkpoint** `best_model_overall.pth` (contains the full model weights, including the ESM backbone for the default config).
+
+The repo now builds the default `esm2_t33_650M_UR50D` architecture locally and then
+loads the weights from `best_model_overall.pth`, so **you do not need a second
+2.6 GB ESM download** just to run prediction.
 
 Download the checkpoint (install the HF CLI first if needed):
 
@@ -141,12 +142,12 @@ pip install fair-esm torchcrf biopython scikit-learn pandas tqdm
   `from crf_compat import CRF` resolves. (On case-insensitive filesystems the
   original `from torchcrf import CRF` would also resolve, but `crf_compat` is the
   safe cross-platform fix.)
-- **ESM weights download starts but then crashes with**
-  `PytorchStreamReader failed reading zip archive` or `failed finding central directory`
-  → the cached fair-esm file under `~/.cache/torch/hub/checkpoints/` is corrupted
-  (usually an interrupted download). The code in this repo now auto-deletes the
-  broken cache file and retries once. If you still hit it, delete
-  `~/.cache/torch/hub/checkpoints/esm2_t33_650M_UR50D*.pt` manually and rerun.
-- **ESM weights won't download at all** (network blocked) → fetch `esm2_t33_650M_UR50D`
-  manually and place it where fair-esm expects, or run from a network that can reach
-  `dl.fbaipublicfiles.com` / `huggingface.co`.
+- **Older checkout still tries to download ESM weights** → `git pull` first. In the
+  current repo version, the default `esm2_t33_650M_UR50D` backbone is constructed
+  locally and populated from `best_model_overall.pth`, so no extra Meta download is
+  needed for prediction.
+- **If you intentionally switch to a different PLM name** and fair-esm starts a remote
+  download, a partial cache file can fail with
+  `PytorchStreamReader failed reading zip archive` / `failed finding central directory`.
+  The code now auto-deletes a corrupted cache file and retries once. If it still
+  fails, delete `~/.cache/torch/hub/checkpoints/<model_name>*.pt` manually and rerun.

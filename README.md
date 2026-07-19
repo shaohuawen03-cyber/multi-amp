@@ -41,6 +41,9 @@ Trained models and data are available on Hugging Face:
 **https://huggingface.co/jiayi11/multi_amp**
 
 Place downloaded checkpoints (e.g. `checkpoints/best_model_overall.pth`) in the local `checkpoints/` directory.
+For the default config (`esm2_t33_650M_UR50D`), prediction builds the ESM-2
+architecture locally and then loads weights from `best_model_overall.pth`, so no
+separate 2.6 GB fair-esm backbone download is required.
 
 See [data/README.md](data/README.md) for details on data format and directory structure.
 

@@ -57,13 +57,39 @@ def _clear_cached_esm_files(model_name: str) -> List[str]:
     return removed_files
 
 
+def _build_local_esm2_model_and_alphabet(model_name: str):
+    """
+    Build the ESM-2 architecture locally without downloading Meta's original .pt.
+    This is enough when the training checkpoint already contains full `plm.*`
+    weights, which is the case for `best_model_overall.pth` used by this project.
+    """
+    if model_name != "esm2_t33_650M_UR50D":
+        return None
+
+    alphabet = esm.data.Alphabet.from_architecture("ESM-1b")
+    model = esm.model.esm2.ESM2(
+        num_layers=33,
+        embed_dim=1280,
+        attention_heads=20,
+        alphabet=alphabet,
+        token_dropout=True,
+    )
+    print(f"Building {model_name} locally (offline init); weights will be loaded from checkpoint.")
+    return model, alphabet
+
+
 def _load_esm_model_and_alphabet_with_retry(model_name: str, retries: int = 1):
     """
-    fair-esm caches large .pt files under ~/.cache/torch/hub/checkpoints.
-    On unstable networks a partial download can be left behind, which later fails
-    with `PytorchStreamReader failed reading zip archive`. When that happens,
-    delete the broken cache file and retry once automatically.
+    Prefer constructing known ESM-2 architectures locally so prediction can run
+    fully offline once `best_model_overall.pth` has been downloaded.
+
+    For other model names, fall back to fair-esm's remote download path. If a
+    partial download was left in cache, delete the broken file and retry once.
     """
+    local_model = _build_local_esm2_model_and_alphabet(model_name)
+    if local_model is not None:
+        return local_model
+
     for attempt in range(retries + 1):
         try:
             return esm.pretrained.load_model_and_alphabet(model_name)
