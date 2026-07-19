@@ -195,7 +195,9 @@ def main():
         print(f"Error: Model not found: {model_path}")
         return
     
-    ckpt = torch.load(model_path, map_location=device, weights_only=False)
+    # Load to CPU first to avoid holding both the model (~2.6GB fp32 ESM-2)
+    # and the checkpoint on the GPU at once (would OOM small-VRAM cards).
+    ckpt = torch.load(model_path, map_location="cpu", weights_only=False)
     if isinstance(ckpt, dict) and "state_dict" in ckpt:
         ckpt = ckpt["state_dict"]
     try:
