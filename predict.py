@@ -32,6 +32,24 @@ from dataset import PeptideDataset, custom_collate_fn
 from config import MultiAMPConfig
 
 
+def remap_checkpoint_keys_for_compat(ckpt):
+    """Map known checkpoint key variants to the names used in this checkout."""
+    if not isinstance(ckpt, dict):
+        return ckpt
+
+    key_aliases = {
+        'ss_crf.start_transitions': 'ss_crf.start_trans',
+        'ss_crf.end_transitions': 'ss_crf.end_trans',
+        'ss_crf.transitions': 'ss_crf.trans_matrix',
+    }
+
+    ckpt = dict(ckpt)
+    for old_key, new_key in key_aliases.items():
+        if old_key in ckpt and new_key not in ckpt:
+            ckpt[new_key] = ckpt.pop(old_key)
+    return ckpt
+
+
 def predict(model, data_loader, device):
     """Generate predictions"""
     model.eval()
@@ -203,6 +221,7 @@ def main():
     ckpt = torch.load(model_path, map_location="cpu", weights_only=False)
     if isinstance(ckpt, dict) and "state_dict" in ckpt:
         ckpt = ckpt["state_dict"]
+    ckpt = remap_checkpoint_keys_for_compat(ckpt)
     try:
         model.load_state_dict(ckpt)
     except RuntimeError as e:

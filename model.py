@@ -692,8 +692,14 @@ class PeptideTriStreamModel(nn.Module):
         else:
             # Without GVP, use fused sequence features directly
             reps_with_structure = fused_sequence_reps
-            # Create zero vector as placeholder for global graph embedding
-            global_graph_embedding = torch.zeros(batch_size, self.config.GNN_OUTPUT_DIM, device=device)
+            # Create a zero placeholder with the SAME dtype/device as the sequence
+            # branch so FP16 inference doesn't upcast the final concatenation.
+            global_graph_embedding = torch.zeros(
+                batch_size,
+                self.config.GNN_OUTPUT_DIM,
+                device=device,
+                dtype=fused_sequence_reps.dtype,
+            )
 
         # ========== 6. Transformer Deep Fusion ==========
         cls_tokens = self.cls_token.expand(batch_size, -1, -1)
